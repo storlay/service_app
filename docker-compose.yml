@@ -1,0 +1,80 @@
+version: "3.9"
+
+services:
+  web-app:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./service:/service
+    environment:
+      - DB_HOST=database
+      - DB_NAME=dbname
+      - DB_USER=dbuser
+      - DB_PASS=pass
+    command: >
+      sh -c "python manage.py runserver 0.0.0.0:8000"
+    depends_on:
+      - database
+
+  database:
+    image: postgres:16.1-alpine
+    environment:
+      - POSTGRES_DB=dbname
+      - POSTGRES_USER=dbuser
+      - POSTGRES_PASSWORD=pass
+
+  redis:
+    image: redis:7.2.4-alpine
+    hostname: redis
+
+  worker:
+    image: service_app-web-app:latest
+    hostname: worker
+    entrypoint: celery
+    command: -A celery_app.app worker --loglevel=info
+    volumes:
+      - ./service:/service
+    environment:
+      - DB_HOST=database
+      - DB_NAME=dbname
+      - DB_USER=dbuser
+      - DB_PASS=pass
+    links:
+      - redis
+    depends_on:
+      - redis
+      - database
+
+  worker2:
+    image: service_app-web-app:latest
+    hostname: worker2
+    entrypoint: celery
+    command: -A celery_app.app worker --loglevel=info
+    volumes:
+      - ./service:/service
+    environment:
+      - DB_HOST=database
+      - DB_NAME=dbname
+      - DB_USER=dbuser
+      - DB_PASS=pass
+    links:
+      - redis
+    depends_on:
+      - redis
+      - database
+
+  flower:
+    image: service_app-web-app:latest
+    hostname: flower
+    entrypoint: celery
+    command: -A celery_app.app flower
+    volumes:
+      - ./service:/service
+    links:
+      - redis
+    depends_on:
+      - redis
+    ports:
+      - "5555:5555"
